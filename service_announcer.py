@@ -1,20 +1,48 @@
 import socket
-import threading
+import json
+import time
+from threading import Thread
 
-def announce_service():
-    announce_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    announce_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    response_message = b"PEER_HERE"
+# Constants
+BROADCAST_IP = "255.255.255.255"  # Typical broadcast address; adjust if needed
+PORT = 6000  # Must match the port used for listening in peer_discovery
+INTERVAL = 5  # Interval in seconds between broadcasts
 
-    def listen_for_discovery():
+def broadcast_presence(username):
+    """Broadcasts the presence of this user to the network."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        # Set the socket option to enable broadcast
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
         while True:
-            try:
-                data, addr = announce_socket.recvfrom(1024)
-                if data.decode() == "DISCOVER_PEERS":
-                    announce_socket.sendto(response_message, addr)
-            except socket.timeout:
-                continue
+            # Prepare the message with the username
+            message = json.dumps({"username": username})
+            # Send the broadcast message
+            sock.sendto(message.encode('utf-8'), (BROADCAST_IP, PORT))
+            print(f"Broadcasting presence of {username}")
+            # Wait for the next broadcast
+            time.sleep(INTERVAL)
 
-    announce_thread = threading.Thread(target=listen_for_discovery)
-    announce_thread.daemon = True
-    announce_thread.start()
+def start_service_announcer(username):
+    """Starts the service announcer in a separate thread."""
+    thread = Thread(target=broadcast_presence, args=(username,))
+    thread.daemon = True  # Daemonize thread
+    thread.start()
+
+def main(username):
+    start_service_announcer(username)
+    # Placeholder for other operations; adjust as necessary
+    try:
+        while True:
+            # Simulate doing other tasks
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Shutting down service announcer.")
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python service_announcer.py <username>")
+    else:
+        username = sys.argv[1]
+        main(username)
